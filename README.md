@@ -1,5 +1,8 @@
 # Acme Air Sample and Benchmark
 
+> **Fork.** This copy updates only the build (Gradle 2.6 → 9.8.2, JDK 17 or later); the application
+> code is that of acmeair/acmeair at commit f161227. See [FORK.md](FORK.md).
+
 This application shows an implementation of a fictitious airline called "Acme Air".  The application was built with the some key business requirements: the ability to scale to billions of web API calls per day, the need to develop and deploy the application in public clouds (as opposed to dedicated pre-allocated infrastructure), and the need to support multiple channels for user interaction (with mobile enablement first and browser/Web 2.0 second).
 
 There are two implementations of the application tier. Each application implementation, supports multiple data tiers.  They are:

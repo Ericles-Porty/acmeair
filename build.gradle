@@ -1,96 +1,95 @@
-
-task wrapper(type: Wrapper) {
-   gradleVersion = '2.6'
-}
+// Build updated for Gradle 9 and current JDKs (17 or later); see FORK.md. The Java sources are
+// those of acmeair/acmeair at commit f16122729873ef0449ea276dfb2d2a1d45bebb40, unchanged.
 
 subprojects {
-    apply plugin: 'java'
+    apply plugin: 'java-library'
     apply plugin: 'eclipse'
+
     repositories {
         mavenCentral()
-        mavenLocal()
+    }
+
+    // The code is Java EE 7 on Java 8; the compiler of a current JDK still targets that release.
+    tasks.withType(JavaCompile).configureEach {
+        options.release = 8
+        options.encoding = 'UTF-8'
+        options.compilerArgs << '-Xlint:-options'
     }
 
     dependencies {
-        compile 'javax:javaee-web-api:7.0'
+        // Provided by the application server.
+        compileOnly 'javax:javaee-web-api:7.0'
     }
-}
-
-project(':acmeair-common') {
 }
 
 project(':acmeair-services') {
     dependencies {
-        compile project(':acmeair-common')
-        compile 'com.googlecode.json-simple:json-simple:1.1.1'
-
+        api project(':acmeair-common')
+        api 'com.googlecode.json-simple:json-simple:1.1.1'
     }
 }
-
-project(':acmeair-services-wxs') {
-    dependencies {
-        compile project(':acmeair-common')
-        compile project(':acmeair-services')
-        compile 'com.ibm.websphere.objectgrid:objectgrid:8.6.0.2'
-    }
-}
-
-
 
 project(':acmeair-services-morphia') {
     dependencies {
-        compile project(':acmeair-common')
-        compile project(':acmeair-services')
-        compile 'org.mongodb:mongo-java-driver:2.13.0'
-        compile 'org.mongodb.morphia:morphia:0.110'
+        api project(':acmeair-common')
+        api project(':acmeair-services')
+        api 'org.mongodb:mongo-java-driver:2.13.0'
+        api 'org.mongodb.morphia:morphia:0.110'
     }
 }
-
 
 project(':acmeair-loader') {
     dependencies {
-        compile project(':acmeair-common')
-        compile project(':acmeair-services')
+        api project(':acmeair-common')
+        api project(':acmeair-services')
     }
 }
 
+// Included only with -Pwxs (see settings.gradle).
+if (findProject(':acmeair-services-wxs') != null) {
+    project(':acmeair-services-wxs') {
+        repositories {
+            mavenLocal()
+        }
+        dependencies {
+            api project(':acmeair-common')
+            api project(':acmeair-services')
+            api 'com.ibm.websphere.objectgrid:objectgrid:8.6.0.2'
+        }
+    }
+}
 
 project(':acmeair-webapp') {
     apply plugin: 'war'
 
+    // Data services packaged in the war: morphia (MongoDB), wxs (WebSphere eXtreme Scale) or all.
+    // Default: all when the wxs project is included, morphia otherwise. Example:
+    //   gradlew -Pwxs -Pservice=wxs build
+    def wxs = findProject(':acmeair-services-wxs') != null
+    def service = (findProperty('service') ?: (wxs ? 'all' : 'morphia')).toString().toLowerCase()
+    if (!(service in ['morphia', 'wxs', 'all'])) {
+        throw new GradleException("Unknown service '${service}': use morphia, wxs or all")
+    }
+    if (service in ['wxs', 'all'] && !wxs) {
+        throw new GradleException("-Pservice=${service} needs the wxs project: add -Pwxs (see settings.gradle)")
+    }
+
     dependencies {
-        compile project(':acmeair-common')
-        compile project(':acmeair-services')
-        compile project(':acmeair-loader')
+        implementation project(':acmeair-common')
+        implementation project(':acmeair-services')
+        implementation project(':acmeair-loader')
 
-        def includeService = "ALL"
-        if (project.hasProperty('service') ) {
-           println "property service exists and has a value of $service "
-           includeService = service
-        } else {
-           println "property service was not set. Using the default value of $includeService"
-           println "   To pick a specific service set the service property using the -P parameter, for example gradlew -Pservice=wxs build " 
+        if (service in ['morphia', 'all']) {
+            implementation(project(':acmeair-services-morphia')) {
+                transitive = false
+            }
+            implementation('org.mongodb.morphia:morphia:0.110') {
+                transitive = false
+            }
         }
-
-        if ("$includeService".equalsIgnoreCase("morphia") || "$includeService".equalsIgnoreCase("ALL")) {
-           println "Including mongoDB morphia service "
-           compile (project(':acmeair-services-morphia')) {
-              transitive = false
-           }
- 
-           compile ('org.mongodb.morphia:morphia:0.110')  {
-              transitive = false
-           }
+        if (service in ['wxs', 'all']) {
+            implementation project(':acmeair-services-wxs')
+            providedRuntime 'com.ibm.websphere.objectgrid:objectgrid:8.6.0.2'
         }
-
-        if ("$includeService".equalsIgnoreCase("wxs") || "$includeService".equalsIgnoreCase("ALL")) {
-           println "Including WXS service "
-
-           compile project(':acmeair-services-wxs')
-           providedRuntime 'com.ibm.websphere.objectgrid:objectgrid:8.6.0.2'
-        }
-
-        providedRuntime 'javax:javaee-web-api:7.0'
     }
 }
-

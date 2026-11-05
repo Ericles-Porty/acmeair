@@ -1,1 +1,10 @@
-include 'acmeair-common', 'acmeair-services', 'acmeair-services-wxs', 'acmeair-services-morphia', 'acmeair-loader', 'acmeair-webapp'
+rootProject.name = 'acmeair'
+
+include 'acmeair-common', 'acmeair-services', 'acmeair-services-morphia', 'acmeair-loader', 'acmeair-webapp'
+
+// The WebSphere eXtreme Scale data service needs IBM's objectgrid client
+// (com.ibm.websphere.objectgrid:objectgrid:8.6.0.2), which is not in a public repository.
+// Install it in the local Maven repository and build with -Pwxs to include that service.
+if (startParameter.projectProperties.containsKey('wxs')) {
+    include 'acmeair-services-wxs'
+}
